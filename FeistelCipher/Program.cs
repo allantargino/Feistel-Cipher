@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -14,7 +15,7 @@ namespace FeistelCipher
             byte msg = 150;
             PrintOutByte("msg: ", msg);
 
-            byte[] keys = { 15, 1, 19 , 3 , 9 , 17, 10 };
+            byte[] keys = { 15, 1, 19 , 3 , 9 };
 
             var encrypted = Encrypt(msg, FunctionF, keys);
             PrintOutByte("enc: ", encrypted);
@@ -27,6 +28,14 @@ namespace FeistelCipher
             else
                 Console.WriteLine("Fail");
 
+            //File Tests:
+
+            EncryptFile(@"C:\Testes\msg.txt", @"C:\Testes\enc.txt", FunctionF, keys);
+            DecryptFile(@"C:\Testes\enc.txt", @"C:\Testes\desc.txt", FunctionF, keys);
+
+            EncryptFile(@"C:\Testes\msg.jpg", @"C:\Testes\enc.jpg", FunctionF, keys);
+            DecryptFile(@"C:\Testes\enc.jpg", @"C:\Testes\desc.jpg", FunctionF, keys);
+
             Console.ReadLine();
         }
 
@@ -37,7 +46,7 @@ namespace FeistelCipher
             byte step = msg;
             for (int i = 0; i < keys.Length; i++)
             {
-                step = FeistelStepEncrypt(step, keys[i], FunctionF);
+                step = FeistelStep(step, keys[i], FunctionF);
             }
 
             return step;
@@ -46,11 +55,12 @@ namespace FeistelCipher
         private static byte Decrypt(byte msg, Func<byte, byte, byte> FunctionF, byte[] keys)
         {
             byte step = msg;
+            step = InversionLR(step);
             for (int i = keys.Length - 1; i >= 0; i--)
             {
-                step = FeistelStepDecrypt(step, keys[i], FunctionF);
-                step = InversionLR(step);
+                step = FeistelStep(step, keys[i], FunctionF);
             }
+            step = InversionLR(step);
 
             return step;
         }
@@ -60,33 +70,18 @@ namespace FeistelCipher
             return Xor(x, key);
         }
 
-
-        private static byte FeistelStepEncrypt(byte msg, byte key, Func<byte, byte, byte> FunctionF)
+        private static byte FeistelStep(byte msg, byte key, Func<byte, byte, byte> FunctionF)
         {
             var R = GetR(msg);
             var L = GetL(msg);
-            //PrintOutByte("R: ", R);
-            //PrintOutByte("L: ", L);
 
-            var oper = OperateR(R, key, FunctionF);
-            //PrintOutByte("oper: ", oper);
+            var funcResult = OperateR(R, key, FunctionF);
 
-            var oper2 = OperateL(L, oper, Xor);
-            //PrintOutByte("R enc: ", oper2);
+            var xorResult = OperateL(L, funcResult, Xor);
 
-            var fresnelParc = InversionLR(oper2, R);
-            //PrintOutByte("Parc: ", fresnelParc);
+            var finalResult = InversionLR(xorResult, R);
 
-            return fresnelParc;
-        }
-
-        private static byte FeistelStepDecrypt(byte msg, byte key, Func<byte, byte, byte> FunctionF)
-        {
-            var inv = InversionLR(msg);
-
-            var fresnelParc = FeistelStepEncrypt(inv, key, FunctionF);
-
-            return fresnelParc;
+            return finalResult;
         }
 
         #endregion
@@ -156,6 +151,32 @@ namespace FeistelCipher
         private static byte EnsureKeyHas4Bits(byte key)
         {
             return (byte)((int)key % 16);
+        }
+
+        #endregion
+
+        #region Files
+
+        private static void EncryptFile(string fileInPath, string fileOutPath, Func<byte, byte, byte> FunctionF, byte[] keys)
+        {
+            byte[] file = File.ReadAllBytes(fileInPath);
+            byte[] encFile = new byte[file.Length];
+            for (int i = 0; i < file.Length; i++)
+            {
+                encFile[i] = Encrypt(file[i], FunctionF, keys);
+            }
+            File.WriteAllBytes(fileOutPath, encFile);
+        }
+
+        private static void DecryptFile(string fileInPath, string fileOutPath, Func<byte, byte, byte> FunctionF, byte[] keys)
+        {
+            byte[] file = File.ReadAllBytes(fileInPath);
+            byte[] decFile = new byte[file.Length];
+            for (int i = 0; i < file.Length; i++)
+            {
+                decFile[i] = Decrypt(file[i], FunctionF, keys);
+            }
+            File.WriteAllBytes(fileOutPath, decFile);
         }
 
         #endregion
